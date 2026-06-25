@@ -6,7 +6,8 @@ Uses a Redis sorted set with timestamped entries for a precise sliding window.
 """
 import time
 import logging
-from fastapi import Request, HTTPException
+from fastapi import Request
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from database import redis_client
 
@@ -60,13 +61,11 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             if current_count >= self.max_requests:
                 retry_after = int(self.window_secs - (now - window_start))
                 logger.warning("Rate limit exceeded for %s (%d/%d)", identity, current_count, self.max_requests)
-                raise HTTPException(
+                return JSONResponse(
                     status_code=429,
-                    detail="Rate limit exceeded",
+                    content={"detail": "Rate limit exceeded"},
                     headers={"Retry-After": str(max(retry_after, 1))}
                 )
-        except HTTPException:
-            raise
         except Exception as e:
             # If Redis fails, allow the request through (fail-open)
             logger.warning("Rate limiter Redis error: %s — allowing request.", e)

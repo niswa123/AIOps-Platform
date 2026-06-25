@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 import json
@@ -11,6 +11,7 @@ from middleware.injection_detector import scan_telemetry_event
 from finops.pricing_engine import calculate_cost, record_cost_and_check_anomaly, get_pricing_table
 from auth.oauth_router import router as oauth_router
 from auth.workspace_router import router as workspace_router
+from auth.rbac import resolve_api_key, AuthContext
 import os
 
 app = FastAPI(
@@ -63,10 +64,8 @@ async def shutdown_event():
 @app.post("/v1/telemetry", status_code=202)
 async def ingest_telemetry(
     event: TelemetryEvent,
-    authorization: Optional[str] = Header(None)
+    auth: AuthContext = Depends(resolve_api_key)
 ):
-    if authorization and not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization header scheme")
 
     # Serialize event
     event_dict = event.dict()

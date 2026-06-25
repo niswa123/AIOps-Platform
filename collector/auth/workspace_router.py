@@ -12,7 +12,7 @@ import datetime
 from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel, EmailStr
 
 from auth.rbac import get_db, require_role, resolve_api_key, AuthContext, generate_api_key
@@ -252,10 +252,10 @@ async def list_members(
     db: Session = Depends(get_db),
 ):
     """List all team members of an organization."""
-    memberships = db.query(Membership).filter(Membership.org_id == org_id).all()
+    memberships = db.query(Membership).options(joinedload(Membership.user)).filter(Membership.org_id == org_id).all()
     results = []
     for m in memberships:
-        user = db.query(User).filter(User.id == m.user_id).first()
+        user = m.user
         results.append(MemberResponse(
             id=m.id,
             user_id=m.user_id,

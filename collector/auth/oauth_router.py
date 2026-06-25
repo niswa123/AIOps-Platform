@@ -22,7 +22,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Depends, Response, Query
 from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from pydantic import BaseModel
 
 from database import redis_client, logger
@@ -389,10 +389,10 @@ async def get_current_session(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    memberships = db.query(Membership).filter(Membership.user_id == user.id).all()
+    memberships = db.query(Membership).options(joinedload(Membership.organization)).filter(Membership.user_id == user.id).all()
     orgs = []
     for m in memberships:
-        org = db.query(Organization).filter(Organization.id == m.org_id).first()
+        org = m.organization
         if org:
             orgs.append({
                 "org_id": org.id,

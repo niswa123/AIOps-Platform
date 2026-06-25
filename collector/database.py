@@ -5,7 +5,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 import clickhouse_connect
 import redis
 from aiokafka import AIOKafkaProducer
-from dotenv import load_file
+from dotenv import load_dotenv
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -14,12 +14,9 @@ logger = logging.getLogger("aiops.database")
 # Load environment
 env_path = os.path.join(os.path.dirname(__file__), '.env')
 if os.path.exists(env_path):
-    # Proactively load variables using simple parser
-    with open(env_path) as f:
-        for line in f:
-            if line.strip() and not line.startswith('#') and '=' in line:
-                k, v = line.strip().split('=', 1)
-                os.environ[k] = v
+    load_dotenv(dotenv_path=env_path)
+else:
+    load_dotenv()
 
 # PostgreSQL connection
 POSTGRES_URL = os.getenv("POSTGRES_URL", "postgresql://postgres:postgrespassword@localhost:5432/aiops_development")

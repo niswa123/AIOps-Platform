@@ -53,25 +53,52 @@ class AuthContext:
     """Resolved authentication context from API key or session token."""
     def __init__(
         self,
-        user: Optional[User],
-        org: Organization,
-        project: Optional[Project],
+        user_id: Optional[str],
+        org_id: str,
+        project_id: Optional[str],
         role: Role,
         api_key_id: Optional[str] = None,
+        db: Optional[Session] = None,
     ):
-        self.user = user
-        self.org = org
-        self.project = project
+        self._user_id = user_id
+        self._org_id = org_id
+        self._project_id = project_id
         self.role = role
         self.api_key_id = api_key_id
+        self._db = db
+        self._user = None
+        self._org = None
+        self._project = None
 
     @property
     def org_id(self) -> str:
-        return self.org.id
+        return self._org_id
 
     @property
     def user_id(self) -> Optional[str]:
-        return self.user.id if self.user else None
+        return self._user_id
+
+    @property
+    def project_id(self) -> Optional[str]:
+        return self._project_id
+
+    @property
+    def org(self) -> Organization:
+        if not self._org and self._db and self._org_id:
+            self._org = self._db.query(Organization).filter(Organization.id == self._org_id).first()
+        return self._org
+
+    @property
+    def project(self) -> Optional[Project]:
+        if not self._project and self._db and self._project_id:
+            self._project = self._db.query(Project).filter(Project.id == self._project_id).first()
+        return self._project
+
+    @property
+    def user(self) -> Optional[User]:
+        if not self._user and self._db and self._user_id:
+            self._user = self._db.query(User).filter(User.id == self._user_id).first()
+        return self._user
 
     def has_role(self, minimum: Role) -> bool:
         """Check if the current role meets the minimum requirement."""
@@ -102,19 +129,14 @@ async def resolve_api_key(
         try:
             cached = redis_client.hgetall(cache_key)
             if cached and cached.get("org_id"):
-                org = db.query(Organization).filter(Organization.id == cached["org_id"]).first()
-                if org:
-                    project = None
-                    if cached.get("project_id"):
-                        project = db.query(Project).filter(Project.id == cached["project_id"]).first()
-
-                    return AuthContext(
-                        user=None,
-                        org=org,
-                        project=project,
-                        role=Role(cached.get("role", "viewer")),
-                        api_key_id=cached.get("key_id"),
-                    )
+                return AuthContext(
+                    user_id=cached.get("user_id") or None,
+                    org_id=cached["org_id"],
+                    project_id=cached.get("project_id") or None,
+                    role=Role(cached.get("role", "viewer")),
+                    api_key_id=cached.get("key_id"),
+                    db=db,
+                )
         except Exception as e:
             logger.debug(f"Redis cache miss for API key: {e}")
 
@@ -126,14 +148,6 @@ async def resolve_api_key(
 
     if not api_key_record:
         raise HTTPException(status_code=403, detail="Invalid or revoked API key")
-
-    org = db.query(Organization).filter(Organization.id == api_key_record.org_id).first()
-    if not org:
-        raise HTTPException(status_code=403, detail="Organization not found for this API key")
-
-    project = None
-    if api_key_record.project_id:
-        project = db.query(Project).filter(Project.id == api_key_record.project_id).first()
 
     # Resolve role via creator membership
     role = Role.VIEWER
@@ -154,20 +168,22 @@ async def resolve_api_key(
         try:
             redis_client.hset(cache_key, mapping={
                 "key_id": api_key_record.id,
-                "org_id": org.id,
+                "org_id": api_key_record.org_id,
                 "project_id": api_key_record.project_id or "",
                 "role": role.value,
+                "user_id": api_key_record.created_by or "",
             })
             redis_client.expire(cache_key, 300)
         except Exception:
             pass
 
     return AuthContext(
-        user=None,
-        org=org,
-        project=project,
+        user_id=api_key_record.created_by,
+        org_id=api_key_record.org_id,
+        project_id=api_key_record.project_id,
         role=role,
         api_key_id=api_key_record.id,
+        db=db,
     )
 
 
