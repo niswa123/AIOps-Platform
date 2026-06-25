@@ -1,0 +1,31 @@
+{
+  "name": "@aiops/sdk",
+  "version": "0.2.0",
+  "description": "Node.js/TypeScript SDK for AIOps Platform Telemetry Ingestion. Auto-instrumentation for OpenAI, Anthropic, Vercel AI SDK, and LangChain.js.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": ["aiops", "observability", "telemetry", "openai", "anthropic", "langchain", "vercel-ai"],
+  "author": "AIOps Team",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  },
+  "peerDependencies": {
+    "openai": ">=4.0.0",
+    "ai": ">=3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "openai": { "optional": true },
+    "ai": { "optional": true }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

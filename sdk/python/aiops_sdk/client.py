@@ -11,9 +11,9 @@ import logging
 logger = logging.getLogger("aiops.sdk")
 
 class TelemetryClient:
-    def __init__(self, api_key: str, collector_url: str = "http://localhost:8000/v1/telemetry", batch_size: int = 20, flush_interval_secs: float = 1.0):
+    def __init__(self, api_key: str, collector_url: str = "http://localhost:8000", batch_size: int = 20, flush_interval_secs: float = 1.0):
         self.api_key = api_key
-        self.collector_url = collector_url
+        self.collector_url = collector_url.rstrip("/")
         self.batch_size = batch_size
         self.flush_interval_secs = flush_interval_secs
         
@@ -58,44 +58,77 @@ class TelemetryClient:
                 self._send_batch(batch)
                 
         # Flush remaining events before stopping
+        remaining = []
         while not self.queue.empty():
             try:
-                event = self.queue.get_nowait()
-                self._send_batch([event])
+                remaining.append(self.queue.get_nowait())
                 self.queue.task_done()
             except queue.Empty:
                 break
+        if remaining:
+            self._send_batch(remaining)
 
-    def _send_batch(self, batch: list):
-        """Sends a batch of events with exponential backoff, falling back to local storage on persistent failure."""
-        for event in batch:
-            self._send_single_event_with_retry(event)
-
-    def _send_single_event_with_retry(self, event: dict, max_retries: int = 3):
+    def _send_batch(self, batch: list, max_retries: int = 3):
+        """Sends a batch of events as a JSON array with exponential backoff.
+        Falls back to local storage on persistent failure."""
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}"
         }
         
-        data = json.dumps(event).encode("utf-8")
-        req = urllib.request.Request(self.collector_url, data=data, headers=headers, method="POST")
+        # Try batch endpoint first
+        batch_url = f"{self.collector_url}/v1/telemetry/batch"
+        data = json.dumps(batch).encode("utf-8")
+        req = urllib.request.Request(batch_url, data=data, headers=headers, method="POST")
         
-        backoff = 0.5  # start with 500ms
+        backoff = 0.5
         for attempt in range(max_retries):
             try:
-                with urllib.request.urlopen(req, timeout=5) as response:
+                with urllib.request.urlopen(req, timeout=10) as response:
                     if response.status in (200, 201, 202):
-                        return  # Success
-            except urllib.error.URLError as e:
-                logger.warning(f"Failed sending telemetry (attempt {attempt+1}/{max_retries}): {e}")
+                        logger.debug(f"Batch of {len(batch)} events sent successfully.")
+                        return
+            except urllib.error.HTTPError as e:
+                if e.code == 404:
+                    # Batch endpoint not available, fall back to single-event sends
+                    logger.info("Batch endpoint not found, falling back to single-event mode.")
+                    self._send_individually(batch, headers, max_retries)
+                    return
+                logger.warning(f"Batch send failed (attempt {attempt+1}/{max_retries}): HTTP {e.code}")
                 time.sleep(backoff)
-                backoff *= 2  # Exponential backoff
+                backoff *= 2
+            except urllib.error.URLError as e:
+                logger.warning(f"Batch send failed (attempt {attempt+1}/{max_retries}): {e}")
+                time.sleep(backoff)
+                backoff *= 2
             except Exception as e:
-                logger.warning(f"Unexpected error during telemetry send: {e}")
+                logger.warning(f"Unexpected error during batch send: {e}")
                 break
                 
-        # If all retries failed, write to local file as backup
-        self._write_to_fallback(event)
+        # All retries failed: save to local fallback
+        for event in batch:
+            self._write_to_fallback(event)
+
+    def _send_individually(self, events: list, headers: dict, max_retries: int = 3):
+        """Fallback: send events one at a time to the single-event endpoint."""
+        single_url = f"{self.collector_url}/v1/telemetry"
+        for event in events:
+            data = json.dumps(event).encode("utf-8")
+            req = urllib.request.Request(single_url, data=data, headers=headers, method="POST")
+            backoff = 0.5
+            sent = False
+            for attempt in range(max_retries):
+                try:
+                    with urllib.request.urlopen(req, timeout=5) as response:
+                        if response.status in (200, 201, 202):
+                            sent = True
+                            break
+                except (urllib.error.URLError, Exception) as e:
+                    logger.warning(f"Single send failed (attempt {attempt+1}/{max_retries}): {e}")
+                    time.sleep(backoff)
+                    backoff *= 2
+            if not sent:
+                self._write_to_fallback(event)
 
     def _write_to_fallback(self, event: dict):
         try:
