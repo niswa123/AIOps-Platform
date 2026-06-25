@@ -55,5 +55,22 @@ This checklist outlines all features required to transition AIOps Platform from 
 - [x] Self-hosted / Helm chart deployment guides for private Kubernetes clusters.
 
 
+## 5. Production Integration & End-to-End Pipeline
+- [ ] **Data Pipeline Wiring (ClickHouse & Postgres Integration)**
+  - [ ] Connect the Next.js frontend charts and trace queries to actual backend REST endpoints (replacing mock data).
+  - [ ] Implement backend endpoints in FastAPI (`collector/main.py`) for querying traces, spans, and FinOps aggregates from ClickHouse.
+  - [ ] Run a daemon manager for `consumer.py` to ensure it automatically starts and scales in lockstep with `collector/main.py`.
+- [ ] **Advanced Ingestion & DB Operations**
+  - [ ] Create ClickHouse materialized views (`hourly_metrics`) for high-performance dashboard aggregations as specified in `GEMINI.md`.
+  - [ ] Setup schema migrations (e.g. Alembic for PostgreSQL, and chdb/migration scripts for ClickHouse).
+- [ ] **Production SSO/Auth Wiring**
+  - [ ] Integrate frontend auth forms and JWT session token storage (localStorage/cookie) with backend `/auth/me` and OAuth redirection callback endpoints.
+  - [ ] Secure all dashboard router endpoints in Next.js using middleware guards checking session validity.
+- [ ] **CI/CD, Monitoring, and Hardening**
+  - [ ] Add GitHub Actions templates for building Docker images (`collector` and `dashboard`).
+  - [ ] Add Helm value testing and configure automatic SSL creation via Cert-Manager.
+  - [ ] Set up Prometheus/Grafana dashboards for tracking system health, Kafka lag, and ClickHouse write queues.
+
+
 ## RESULT
-1, 2, 3, 4
+1, 2, 3, 4, 5
