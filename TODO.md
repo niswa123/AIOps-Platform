@@ -5,17 +5,18 @@ This checklist outlines all features required to transition AIOps Platform from 
 ---
 
 ## 1. SDKs & Auto-Instrumentation
-- [ ] **SDK Core Enhancements**
-  - [ ] Add asynchronous batching & memory buffering for telemetry payloads (prevents blocking target agent execution).
-  - [ ] Implement exponential backoff & offline fallback cache for SDK payloads.
-- [ ] **Python Integrations**
-  - [ ] Auto-instrumentation hooks for **LangChain** (Callback Handler).
-  - [ ] Auto-instrumentation hooks for **LlamaIndex** (Instrumentor).
-  - [ ] Auto-instrumentation hooks for **CrewAI** & **AutoGen** frameworks.
-  - [ ] Native support for local model providers (Ollama, vLLM, HuggingFace Transformers).
-- [ ] **Node.js / TypeScript Integrations**
-  - [ ] Auto-instrumentation hooks for Vercel AI SDK.
-  - [ ] Auto-instrumentation hooks for LangChain.js.
+- [x] **SDK Core Enhancements**
+  - [x] Add asynchronous batching & memory buffering for telemetry payloads (prevents blocking target agent execution).
+  - [x] Implement exponential backoff & offline fallback cache for SDK payloads.
+- [x] **Python Integrations**
+  - [x] Auto-instrumentation hooks for **LangChain** (Callback Handler).
+  - [x] Auto-instrumentation hooks for **LlamaIndex** (Instrumentor).
+  - [x] Auto-instrumentation hooks for **CrewAI** & **AutoGen** frameworks.
+  - [x] Native support for local model providers (Ollama, vLLM, HuggingFace Transformers).
+- [x] **Node.js / TypeScript Integrations**
+  - [x] Auto-instrumentation hooks for Vercel AI SDK.
+  - [x] Auto-instrumentation hooks for LangChain.js.
+
 
 ---
 
