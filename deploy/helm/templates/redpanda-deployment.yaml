@@ -1,0 +1,52 @@
+{{- if .Values.redpanda.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-redpanda
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}-redpanda
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.redpanda.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-redpanda
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-redpanda
+    spec:
+      containers:
+        - name: redpanda
+          image: "{{ .Values.redpanda.image.repository }}:{{ .Values.redpanda.image.tag }}"
+          command:
+            - rpk
+            - redpanda
+            - start
+            - --mode
+            - dev-container
+            - --kafka-addr
+            - PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+            - --advertise-kafka-addr
+            - PLAINTEXT://127.0.0.1:29092,OUTSIDE://{{ .Release.Name }}-redpanda:9092
+          ports:
+            - containerPort: 9092
+              name: kafka
+            - containerPort: 9644
+              name: admin
+          resources:
+            {{- toYaml .Values.redpanda.resources | nindent 12 }}
+          volumeMounts:
+            - name: redpanda-data
+              mountPath: /var/lib/redpanda
+      volumes:
+        - name: redpanda-data
+          {{- if .Values.redpanda.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-redpanda-pvc
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

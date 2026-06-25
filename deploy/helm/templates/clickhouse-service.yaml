@@ -1,0 +1,40 @@
+{{- if .Values.clickhouse.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-clickhouse
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}-clickhouse
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  ports:
+    - port: 9000
+      targetPort: native
+      name: native
+      protocol: TCP
+    - port: 8123
+      targetPort: http
+      name: http
+      protocol: TCP
+  selector:
+    app: {{ .Release.Name }}-clickhouse
+---
+{{- if .Values.clickhouse.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-clickhouse-pvc
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}-clickhouse
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.clickhouse.persistence.size | quote }}
+  {{- if .Values.clickhouse.persistence.storageClass }}
+  storageClassName: {{ .Values.clickhouse.persistence.storageClass | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}

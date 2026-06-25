@@ -1,0 +1,35 @@
+{{- if .Values.redis.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-redis
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}-redis
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  ports:
+    - port: 6379
+      targetPort: redis
+      protocol: TCP
+  selector:
+    app: {{ .Release.Name }}-redis
+---
+{{- if .Values.redis.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-redis-pvc
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}-redis
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.redis.persistence.size | quote }}
+  {{- if .Values.redis.persistence.storageClass }}
+  storageClassName: {{ .Values.redis.persistence.storageClass | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,40 @@
+{{- if .Values.redpanda.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-redpanda
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}-redpanda
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  ports:
+    - port: 9092
+      targetPort: kafka
+      name: kafka
+      protocol: TCP
+    - port: 9644
+      targetPort: admin
+      name: admin
+      protocol: TCP
+  selector:
+    app: {{ .Release.Name }}-redpanda
+---
+{{- if .Values.redpanda.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-redpanda-pvc
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}-redpanda
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.redpanda.persistence.size | quote }}
+  {{- if .Values.redpanda.persistence.storageClass }}
+  storageClassName: {{ .Values.redpanda.persistence.storageClass | quote }}
+  {{- end }}
+{{- end }}
+{{- end }}

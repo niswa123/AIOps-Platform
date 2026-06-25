@@ -1,0 +1,52 @@
+{{- if .Values.clickhouse.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-clickhouse
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}-clickhouse
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.clickhouse.replicaCount }}
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-clickhouse
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-clickhouse
+    spec:
+      containers:
+        - name: clickhouse
+          image: "{{ .Values.clickhouse.image.repository }}:{{ .Values.clickhouse.image.tag }}"
+          ports:
+            - containerPort: 9000
+              name: native
+            - containerPort: 8123
+              name: http
+          env:
+            - name: CLICKHOUSE_DB
+              value: {{ .Values.clickhouse.auth.database | quote }}
+            - name: CLICKHOUSE_USER
+              value: {{ .Values.clickhouse.auth.username | quote }}
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-secrets
+                  key: CLICKHOUSE_PASSWORD
+          resources:
+            {{- toYaml .Values.clickhouse.resources | nindent 12 }}
+          volumeMounts:
+            - name: clickhouse-data
+              mountPath: /var/lib/clickhouse
+      volumes:
+        - name: clickhouse-data
+          {{- if .Values.clickhouse.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-clickhouse-pvc
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

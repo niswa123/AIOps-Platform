@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-dashboard
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}-dashboard
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.dashboard.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-dashboard
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-dashboard
+    spec:
+      containers:
+        - name: dashboard
+          image: "{{ .Values.dashboard.image.repository }}:{{ .Values.dashboard.image.tag }}"
+          imagePullPolicy: {{ .Values.dashboard.image.pullPolicy }}
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+            - name: NEXT_PUBLIC_TELEMETRY_ENDPOINT
+              value: "http://{{ .Release.Name }}-collector:8000/v1/telemetry"
+          resources:
+            {{- toYaml .Values.dashboard.resources | nindent 12 }}
+      {{- with .Values.dashboard.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.dashboard.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.dashboard.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
