@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException, Header
+from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 import json
 import datetime
@@ -8,9 +9,28 @@ from middleware.rate_limiter import RateLimitMiddleware
 from middleware.pii_scrubber import scrub_telemetry_event
 from middleware.injection_detector import scan_telemetry_event
 from finops.pricing_engine import calculate_cost, record_cost_and_check_anomaly, get_pricing_table
+from auth.oauth_router import router as oauth_router
+from auth.workspace_router import router as workspace_router
 import os
 
-app = FastAPI(title="AIOps Observability Collector API", version="1.0.0")
+app = FastAPI(
+    title="AIOps Observability Collector API",
+    version="2.0.0",
+    description="Telemetry ingestion, multi-tenant workspace management, and SSO authentication.",
+)
+
+# CORS for dashboard frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[os.getenv("FRONTEND_URL", "http://localhost:3000")],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Register auth & workspace routers
+app.include_router(oauth_router)
+app.include_router(workspace_router)
 
 # Wire up rate limiting middleware
 app.add_middleware(RateLimitMiddleware, window_secs=60, max_requests=600)
@@ -21,6 +41,17 @@ KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "aiops.telemetry.events")
 @app.on_event("startup")
 async def startup_event():
     setup_databases()
+    # Create multi-tenant tables (organizations, users, memberships, api_keys, projects)
+    try:
+        from auth.tenant_models import Organization, Project, User, Membership, ApiKey
+        from database import engine
+        from auth.tenant_models import Base as TenantBase
+        # Use the same Base from database.py since tenant_models imports it
+        from database import Base
+        Base.metadata.create_all(bind=engine)
+        logger.info("Multi-tenant database schemas created/validated.")
+    except Exception as e:
+        logger.warning(f"Could not create tenant schemas: {e}")
     await init_kafka()
 
 
