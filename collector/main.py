@@ -1,62 +1,91 @@
-from fastapi import FastAPI, HTTPException, Header, Depends
-from typing import List, Optional
+from fastapi import FastAPI, HTTPException, Header
+from typing import Optional
 import json
 import datetime
-from database import init_kafka, close_kafka, kafka_producer, ch_client, logger
+from database import init_kafka, close_kafka, kafka_producer, ch_client, redis_client, logger
 from models import TelemetryEvent, setup_databases
+from middleware.rate_limiter import RateLimitMiddleware
+from middleware.pii_scrubber import scrub_telemetry_event
+from middleware.injection_detector import scan_telemetry_event
+from finops.pricing_engine import calculate_cost, record_cost_and_check_anomaly, get_pricing_table
 import os
 
 app = FastAPI(title="AIOps Observability Collector API", version="1.0.0")
 
+# Wire up rate limiting middleware
+app.add_middleware(RateLimitMiddleware, window_secs=60, max_requests=600)
+
 KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "aiops.telemetry.events")
+
 
 @app.on_event("startup")
 async def startup_event():
-    # Setup database schemas in PostgreSQL and ClickHouse
     setup_databases()
-    # Init Kafka Producer
     await init_kafka()
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
     await close_kafka()
+
 
 @app.post("/v1/telemetry", status_code=202)
 async def ingest_telemetry(
     event: TelemetryEvent,
     authorization: Optional[str] = Header(None)
 ):
-    # Simple API Key check for MVP (can be extended to check Postgres hashes)
     if authorization and not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Invalid authorization header scheme")
 
     # Serialize event
     event_dict = event.dict()
-    # Handle metadata serialization for DB write
+
+    # --- FinOps: recalculate cost using the pricing engine ---
+    calculated_cost = calculate_cost(event.model, event.prompt_tokens, event.completion_tokens)
+    if calculated_cost > 0:
+        event_dict["cost"] = calculated_cost
+
+    # Handle metadata serialization
     metadata_json = json.dumps(event_dict.get("metadata") or {})
     event_dict["metadata"] = metadata_json
     event_dict["event_timestamp"] = datetime.datetime.utcnow().isoformat()
-    # Map status to CH enum
     status_ch = "success" if event.status == "success" else "error"
     event_dict["status"] = status_ch
     event_dict["error_message"] = event.error or ""
-    # Pop fields that are not in ClickHouse table or handled differently
     event_dict.pop("error", None)
 
-    # 1. Pipeline Option A: Push to Kafka/Redpanda
+    # --- Privacy: scrub PII & secrets from event ---
+    event_dict = scrub_telemetry_event(event_dict)
+
+    # --- Security: scan for prompt injection patterns ---
+    injection_alert = scan_telemetry_event(event_dict)
+
+    # --- FinOps: anomaly cost detection ---
+    cost_alert = record_cost_and_check_anomaly(
+        agent_id=event.agent_id,
+        cost=event_dict.get("cost", 0.0),
+    )
+
+    # Build response with optional alerts
+    alerts = []
+    if injection_alert:
+        alerts.append(injection_alert)
+    if cost_alert:
+        alerts.append(cost_alert)
+
+    # 1. Pipeline A: Push to Kafka/Redpanda
     if kafka_producer:
         try:
-            payload = json.dumps(event_dict).encode("utf-8")
+            payload = json.dumps(event_dict, default=str).encode("utf-8")
             await kafka_producer.send_and_wait(KAFKA_TOPIC, payload)
-            logger.debug(f"Pushed trace {event.trace_id} to Kafka.")
-            return {"status": "accepted", "pipeline": "kafka"}
+            logger.debug("Pushed trace %s to Kafka.", event.trace_id)
+            return {"status": "accepted", "pipeline": "kafka", "alerts": alerts}
         except Exception as e:
-            logger.warning(f"Failed to push to Kafka, falling back to direct ClickHouse insert: {e}")
+            logger.warning("Failed to push to Kafka, falling back to direct ClickHouse insert: %s", e)
 
-    # 2. Pipeline Option B: Write directly to ClickHouse (Direct Sync Insert)
+    # 2. Pipeline B: Direct ClickHouse insert
     if ch_client:
         try:
-            # Clickhouse-connect insert expects a list of rows
             data_row = [
                 event_dict["trace_id"],
                 event_dict["span_id"],
@@ -86,20 +115,28 @@ async def ingest_telemetry(
                     'status', 'error_message', 'span_type', 'metadata'
                 ]
             )
-            logger.debug(f"Inserted trace {event.trace_id} directly to ClickHouse.")
-            return {"status": "accepted", "pipeline": "clickhouse_direct"}
+            logger.debug("Inserted trace %s directly to ClickHouse.", event.trace_id)
+            return {"status": "accepted", "pipeline": "clickhouse_direct", "alerts": alerts}
         except Exception as e:
-            logger.error(f"Failed direct ClickHouse write: {e}")
+            logger.error("Failed direct ClickHouse write: %s", e)
             raise HTTPException(status_code=500, detail="Database write failure")
 
-    # If no backend is connected, log to console
-    logger.info(f"Ingested local trace trace_id={event.trace_id} agent_id={event.agent_id} model={event.model}")
-    return {"status": "accepted", "pipeline": "logger"}
+    # 3. Fallback: log to console
+    logger.info("Ingested local trace trace_id=%s agent_id=%s model=%s", event.trace_id, event.agent_id, event.model)
+    return {"status": "accepted", "pipeline": "logger", "alerts": alerts}
+
 
 @app.get("/health")
 def health_check():
     return {
         "status": "healthy",
         "clickhouse_connected": ch_client is not None,
-        "kafka_connected": kafka_producer is not None
+        "kafka_connected": kafka_producer is not None,
+        "redis_connected": redis_client is not None,
     }
+
+
+@app.get("/v1/pricing")
+def pricing_table():
+    """Return the full model pricing table for the dashboard FinOps view."""
+    return get_pricing_table()
