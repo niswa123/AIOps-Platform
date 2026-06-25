@@ -435,3 +435,129 @@ Is the server running on that host and accepting TCP/IP connections?`,
     prompt_input: "SELECT * FROM invoices WHERE id = '90812'"
   }
 ];
+
+// ──────────── Workspace & Enterprise Mock Data ────────────
+
+export interface OrgMember {
+  id: string;
+  email: string;
+  name: string;
+  role: "owner" | "admin" | "viewer";
+  avatar_initial: string;
+  joined: string;
+  last_active: string;
+}
+
+export interface OrgProject {
+  id: string;
+  name: string;
+  slug: string;
+  description: string;
+  agent_count: number;
+  created_at: string;
+}
+
+export interface OrgApiKey {
+  id: string;
+  name: string;
+  key_prefix: string;
+  project: string;
+  created_at: string;
+  last_used: string;
+  is_active: boolean;
+}
+
+export const MOCK_ORG = {
+  id: "org-niswa123",
+  name: "Niswa AI Labs",
+  slug: "niswa123",
+  plan: "Pro",
+  created_at: "2026-05-10T08:00:00Z",
+};
+
+export const MOCK_MEMBERS: OrgMember[] = [
+  {
+    id: "user-1",
+    email: "ape.ces@niswa123.ai",
+    name: "Ape Ces",
+    role: "owner",
+    avatar_initial: "AC",
+    joined: "2026-05-10",
+    last_active: "2026-06-25",
+  },
+  {
+    id: "user-2",
+    email: "dev@niswa123.ai",
+    name: "Dev Ops",
+    role: "admin",
+    avatar_initial: "DO",
+    joined: "2026-05-15",
+    last_active: "2026-06-24",
+  },
+  {
+    id: "user-3",
+    email: "viewer@external.com",
+    name: "External Auditor",
+    role: "viewer",
+    avatar_initial: "EA",
+    joined: "2026-06-01",
+    last_active: "2026-06-20",
+  },
+];
+
+export const MOCK_PROJECTS: OrgProject[] = [
+  {
+    id: "proj-crm",
+    name: "CRM Integration",
+    slug: "crm-integration",
+    description: "Customer support bots and invoice dispute resolution agents.",
+    agent_count: 2,
+    created_at: "2026-05-12",
+  },
+  {
+    id: "proj-intel",
+    name: "Competitor Intelligence",
+    slug: "competitor-intelligence",
+    description: "Market research and GPU pricing analysis agents.",
+    agent_count: 1,
+    created_at: "2026-05-20",
+  },
+  {
+    id: "proj-internal",
+    name: "Internal Tools",
+    slug: "internal-tools",
+    description: "Code review bots and documentation generators.",
+    agent_count: 3,
+    created_at: "2026-06-05",
+  },
+];
+
+export const MOCK_API_KEYS: OrgApiKey[] = [
+  {
+    id: "key-1",
+    name: "Production SDK Key",
+    key_prefix: "aio_xK9m...",
+    project: "CRM Integration",
+    created_at: "2026-05-12",
+    last_used: "2026-06-25 23:45",
+    is_active: true,
+  },
+  {
+    id: "key-2",
+    name: "Staging Key",
+    key_prefix: "aio_bT2n...",
+    project: "Competitor Intelligence",
+    created_at: "2026-05-20",
+    last_used: "2026-06-25 23:40",
+    is_active: true,
+  },
+  {
+    id: "key-3",
+    name: "Deprecated CI Key",
+    key_prefix: "aio_oL7q...",
+    project: "Internal Tools",
+    created_at: "2026-06-01",
+    last_used: "2026-06-18 10:22",
+    is_active: false,
+  },
+];

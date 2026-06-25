@@ -10,7 +10,8 @@ import {
   Layers,
   Database,
   User,
-  ExternalLink
+  ExternalLink,
+  Settings
 } from "lucide-react";
 
 export default function Sidebar() {
@@ -21,6 +22,7 @@ export default function Sidebar() {
     { name: "FinOps Cost Center", href: "/finops", icon: Coins },
     { name: "Prompt Registry", href: "/prompts", icon: Terminal },
     { name: "Error Monitor", href: "/errors", icon: Bug },
+    { name: "Settings & Team", href: "/settings", icon: Settings },
   ];
 
   return (
