@@ -562,7 +562,7 @@ export default function SettingsPage() {
                       <div className="col-span-3 pr-3">
                         <select
                           value={member.role}
-                          onChange={(e) => handleUpdateMemberRole(member.id, e.target.value as any)}
+                          onChange={(e) => handleUpdateMemberRole(member.id, e.target.value as "owner" | "admin" | "viewer")}
                           className="bg-bg-elevated border border-border-muted text-text-primary rounded text-[11px] font-mono px-2 py-1 outline-none focus:border-text-dim transition-all cursor-pointer"
                         >
                           <option value="owner">Owner (Full Admin)</option>
@@ -648,7 +648,7 @@ export default function SettingsPage() {
                             type="radio"
                             name="newMemberRole"
                             checked={newMemberRole === role}
-                            onChange={() => setNewMemberRole(role as any)}
+                            onChange={() => setNewMemberRole(role as "owner" | "admin" | "viewer")}
                             className="hidden"
                           />
                           <span className="font-mono text-[10px] capitalize">{role}</span>

@@ -13,7 +13,7 @@ export interface TelemetrySpan {
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 export interface Trace {

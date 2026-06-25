@@ -17,6 +17,15 @@ import {
   Database
 } from "lucide-react";
 
+interface SimulationResult {
+  output: string;
+  latency_ms: number;
+  cost: number;
+  tokens_in: number;
+  tokens_out: number;
+  total_tokens: number;
+}
+
 export default function PromptsPage() {
   const [prompts] = useState<PromptItem[]>(MOCK_PROMPTS);
   const [selectedPromptId, setSelectedPromptId] = useState<string>(MOCK_PROMPTS[0].id);
@@ -28,7 +37,7 @@ export default function PromptsPage() {
     order_details: "Order #90812, invoice disputed due to double charge. Refund value: $45.00."
   });
   const [isSimulating, setIsSimulating] = useState(false);
-  const [simulationResult, setSimulationResult] = useState<any | null>(null);
+  const [simulationResult, setSimulationResult] = useState<SimulationResult | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
 
   const selectedPrompt = prompts.find(p => p.id === selectedPromptId) || prompts[0];
